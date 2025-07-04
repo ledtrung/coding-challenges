@@ -13,7 +13,6 @@ public class UserQuiz
         if (quiz is null)
             throw new ArgumentException("Invalid quiz", nameof(quiz));
             
-        UserQuizId = Guid.NewGuid();
         UserId = userId;
         QuizId = quiz.QuizId;
         StartedAt = DateTime.UtcNow;

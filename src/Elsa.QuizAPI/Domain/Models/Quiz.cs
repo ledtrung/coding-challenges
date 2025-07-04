@@ -12,7 +12,6 @@ public class Quiz
         if (timeLimit.TotalSeconds <= 0)
             throw new ArgumentException("Invalid time limit", nameof(timeLimit));
 
-        QuizId = Guid.NewGuid();
         Title = title.Trim();
         Description = description?.Trim() ?? string.Empty;
         TimeLimit = timeLimit;

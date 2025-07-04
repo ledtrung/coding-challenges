@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Elsa.QuizAPI.Data;
 using StackExchange.Redis;
 
 namespace Elsa.QuizAPI.Infrastructure;
@@ -7,7 +6,6 @@ namespace Elsa.QuizAPI.Infrastructure;
 public interface IEventPublisher
 {
     Task PublishScoreUpdateAsync(ScoreUpdateEvent scoreUpdate);
-    Task PublishLeaderboardUpdateAsync(LeaderboardUpdateEvent leaderboardUpdate);
 }
 
 public class RedisEventPublisher : IEventPublisher
@@ -37,23 +35,6 @@ public class RedisEventPublisher : IEventPublisher
             _logger.LogError(ex, "Failed to publish score update");
         }
     }
-    
-    public async Task PublishLeaderboardUpdateAsync(LeaderboardUpdateEvent leaderboardUpdate)
-    {
-        try
-        {
-            var database = _redis.GetDatabase();
-            var channel = $"quiz:{leaderboardUpdate.QuizId}:leaderboard_updates";
-            var message = JsonSerializer.Serialize(leaderboardUpdate);
-            
-            await database.PublishAsync(channel, message);
-            _logger.LogDebug($"Published leaderboard update for quiz {leaderboardUpdate.QuizId}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to publish leaderboard update");
-        }
-    }
 }
 
 public class ScoreUpdateEvent
@@ -65,12 +46,5 @@ public class ScoreUpdateEvent
     public int PointsEarned { get; set; }
     public bool IsCorrect { get; set; }
     public string QuestionId { get; set; } = string.Empty;
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-}
-
-public class LeaderboardUpdateEvent
-{
-    public string QuizId { get; set; } = string.Empty;
-    public List<LeaderboardEntry> Leaderboard { get; set; } = new();
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }

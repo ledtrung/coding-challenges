@@ -5,14 +5,11 @@ public class User
     
     private User() { }
     
-    public User(Guid userId, string username)
+    public User(string username)
     {
-        if (Guid.Empty.Equals(userId))
-            throw new ArgumentException("User ID cannot be empty", nameof(userId));
         if (string.IsNullOrWhiteSpace(username))
             throw new ArgumentException("Username cannot be empty", nameof(username));
             
-        UserId = userId;
         Username = username.Trim();
     }
 

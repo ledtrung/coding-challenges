@@ -2,7 +2,7 @@ namespace Elsa.QuizAPI.Domain.Models;
 
 public class UserQuizQuestion
 {
-    private UserQuizQuestion() { } // EF Core constructor
+    private UserQuizQuestion() { }
     
     public UserQuizQuestion(Guid userQuizId, QuizQuestion question)
     {

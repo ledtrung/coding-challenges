@@ -1,5 +1,4 @@
 using Elsa.QuizAPI.Data;
-using Elsa.QuizAPI.Features.Quizzes;
 using Elsa.QuizAPI.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -32,9 +31,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")));
 
 // Register Quiz API services only
-builder.Services.AddScoped<IQuizService, QuizService>();
-builder.Services.AddScoped<IQuizRepository, QuizRepository>();
-builder.Services.AddScoped<IScoreCalculator, ScoreCalculator>();
+// builder.Services.AddScoped<IQuizService, QuizService>();
+// builder.Services.AddScoped<IQuizRepository, QuizRepository>();
+// builder.Services.AddScoped<IScoreCalculator, ScoreCalculator>();
 builder.Services.AddScoped<IEventPublisher, RedisEventPublisher>();
 
 builder.Services.AddControllers();

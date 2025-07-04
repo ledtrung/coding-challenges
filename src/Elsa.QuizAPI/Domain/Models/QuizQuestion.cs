@@ -15,7 +15,6 @@ public class QuizQuestion
         if (correctOption is null || string.IsNullOrWhiteSpace(correctOption.OptionText) || !correctOption.IsCorrect)
             throw new ArgumentException("Invalid correct option", nameof(correctOption));
 
-        QuestionId = Guid.NewGuid();
         QuizId = quizId;
         Text = text.Trim();
         Points = points;
