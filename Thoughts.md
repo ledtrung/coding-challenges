@@ -10,6 +10,8 @@ https://claude.ai/chat/863c850a-4e81-4753-a9f5-9b1abf934f96
 - Separated web socket services and quiz service, due to the big number of concurrent users.
 - Only use web socket for score updates, dashboard updates ... http for other things
 - Cache quiz
+- Traditional service approach instead of DDD
+- Encapsulation => Partially adopt DDD
 
 
 ### Steps
