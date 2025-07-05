@@ -1,10 +1,10 @@
+using System.Net.Quic;
+using System.Text.Json.Serialization;
+
 namespace Elsa.QuizAPI.Domain.Models;
 public class Quiz
 {
-    private readonly List<QuizQuestion> _questions = new();
-    
     private Quiz() { }
-
     public Quiz(string title, string description, TimeSpan timeLimit)
     {
         if (string.IsNullOrWhiteSpace(title))
@@ -17,41 +17,40 @@ public class Quiz
         TimeLimit = timeLimit;
     }
 
-    public Guid QuizId { get; private set; }
-    public string Title { get; private set; } = string.Empty;
-    public string Description { get; private set; } = string.Empty;
-    public TimeSpan TimeLimit { get; private set; }
-    
-    public IReadOnlyList<QuizQuestion> Questions => _questions.AsReadOnly();
-    
-    // Computed properties
-    public int TotalQuestions => _questions.Count;
-    public int TotalPoints => _questions.Sum(q => q.Points);
-    public bool HasQuestions => _questions.Any();
+    public Guid QuizId { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public TimeSpan TimeLimit { get; init; }
 
+    // private readonly List<QuizQuestion> _questions = new();
+
+    //Should use backing field instead for better encapsulation, 
+    // but the json serialization is a little bit complicate to implement for this sample project
+    public List<QuizQuestion> Questions { get; init; }
+    
     public void AddQuestion(QuizQuestion question)
     {
         if (question == null)
             throw new ArgumentNullException(nameof(question));
         if (question.QuizId != QuizId)
             throw new ArgumentException("Question belongs to different quiz");
-        if (_questions.Any(q => q.QuestionId == question.QuestionId))
+        if (Questions.Any(q => q.QuestionId == question.QuestionId))
             throw new ArgumentException("Question already exists in quiz");
             
-        _questions.Add(question);
+        Questions.Add(question);
     }
 
     public QuizQuestion? GetQuestion(Guid questionId)
     {
-        return _questions.FirstOrDefault(q => q.QuestionId == questionId);
+        return Questions.FirstOrDefault(q => q.QuestionId == questionId);
     }
 
     public void RemoveQuestion(Guid questionId)
     {
-        var question = _questions.FirstOrDefault(q => q.QuestionId == questionId);
+        var question = Questions.FirstOrDefault(q => q.QuestionId == questionId);
         if (question != null)
         {
-            _questions.Remove(question);
+            Questions.Remove(question);
         }
     }
 

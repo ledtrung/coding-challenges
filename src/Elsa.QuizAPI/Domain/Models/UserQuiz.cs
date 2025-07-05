@@ -21,7 +21,7 @@ public class UserQuiz
         
         foreach (var question in quiz.Questions)
         {
-            var questionAttempt = new UserQuizQuestion(UserQuizId, question);
+            var questionAttempt = new UserQuizQuestion(question);
             _questionAttempts.Add(questionAttempt);
         }
     }
@@ -33,17 +33,11 @@ public class UserQuiz
     public DateTime ExpiresAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public UserQuizStatus Status { get; private set; }
-    public int CurrentScore { get; private set; }
     
     public IReadOnlyList<UserQuizQuestion> QuestionAttempts => _questionAttempts.AsReadOnly();
-    
-    public bool IsInProgress => Status == UserQuizStatus.InProgress;
-    public bool IsCompleted => Status == UserQuizStatus.Completed;
-    public bool IsExpired => Status == UserQuizStatus.Expired || DateTime.UtcNow > ExpiresAt;
-    public bool IsAbandoned => Status == UserQuizStatus.Abandoned;
-    public TimeSpan? Duration => CompletedAt?.Subtract(StartedAt);
-    public TimeSpan RemainingTime => IsExpired ? TimeSpan.Zero : ExpiresAt.Subtract(DateTime.UtcNow);
 
+    public int TotalPointsEarned => QuestionAttempts.Where(q => q.IsCorrect).Sum(q => q.PointsEarned);
+    
     public UserQuizQuestion? GetQuestionAttempt(Guid questionId)
     {
         return _questionAttempts.FirstOrDefault(qa => qa.QuestionId == questionId);

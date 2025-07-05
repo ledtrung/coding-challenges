@@ -5,7 +5,7 @@ namespace Elsa.QuizAPI.Infrastructure;
 
 public interface IEventPublisher
 {
-    Task PublishScoreUpdateAsync(ScoreUpdateEvent scoreUpdate);
+    Task PublishEventAsync(IQuizEvent @event);
 }
 
 public class RedisEventPublisher : IEventPublisher
@@ -19,32 +19,37 @@ public class RedisEventPublisher : IEventPublisher
         _logger = logger;
     }
     
-    public async Task PublishScoreUpdateAsync(ScoreUpdateEvent scoreUpdate)
+    public async Task PublishEventAsync(IQuizEvent @event)
     {
         try
         {
             var database = _redis.GetDatabase();
-            var channel = $"quiz:{scoreUpdate.QuizId}:score_updates";
-            var message = JsonSerializer.Serialize(scoreUpdate);
+            var channel = new RedisChannel($"quiz:{@event.QuizId}:points_updates", RedisChannel.PatternMode.Pattern);
+            var message = JsonSerializer.Serialize(@event, @event.GetType());
             
             await database.PublishAsync(channel, message);
-            _logger.LogDebug($"Published score update for user {scoreUpdate.UserId} in quiz {scoreUpdate.QuizId}");
+            _logger.LogInformation($"Event published for user {@event.UserId} in quiz {@event.QuizId}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish score update");
+            _logger.LogError(ex, "Failed to publish event");
         }
     }
 }
 
-public class ScoreUpdateEvent
+public interface IQuizEvent
 {
-    public string UserId { get; set; } = string.Empty;
-    public string Username { get; set; } = string.Empty;
-    public string QuizId { get; set; } = string.Empty;
-    public int NewScore { get; set; }
-    public int PointsEarned { get; set; }
+    Guid UserId { get; set; }
+    Guid QuizId { get; set; }
+}
+
+
+public class QuizQuestionAnsweredEvent : IQuizEvent
+{
+    public Guid UserId { get; set; }
+    public Guid QuizId { get; set; }
+    public Guid QuestionId { get; set; }
     public bool IsCorrect { get; set; }
-    public string QuestionId { get; set; } = string.Empty;
-    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public int PointsEarned { get; set; }
+    public int TotalPointsEarned { get; set; }
 }

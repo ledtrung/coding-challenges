@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Elsa.QuizAPI.Migrations
 {
     [DbContext(typeof(QuizDbContext))]
-    [Migration("20250704164503_Initial")]
+    [Migration("20250705054158_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -124,7 +124,7 @@ namespace Elsa.QuizAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserQuiz");
+                    b.ToTable("UserQuizzes");
                 });
 
             modelBuilder.Entity("Elsa.QuizAPI.Domain.Models.UserQuizQuestion", b =>

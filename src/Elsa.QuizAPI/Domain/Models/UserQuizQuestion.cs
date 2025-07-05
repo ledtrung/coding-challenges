@@ -4,15 +4,11 @@ public class UserQuizQuestion
 {
     private UserQuizQuestion() { }
     
-    public UserQuizQuestion(Guid userQuizId, QuizQuestion question)
+    public UserQuizQuestion(QuizQuestion question)
     {
-        if (Guid.Empty.Equals(userQuizId))
-            throw new ArgumentException("User quiz ID cannot be empty", nameof(userQuizId));
         if (Guid.Empty.Equals(question.QuestionId))
             throw new ArgumentNullException("Question ID cannot be empty", nameof(question));
             
-        UserQuizQuestionId = Guid.NewGuid();
-        UserQuizId = userQuizId;
         QuestionId = question.QuestionId;
     }
 

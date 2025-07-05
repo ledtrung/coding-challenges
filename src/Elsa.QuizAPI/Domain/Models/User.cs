@@ -17,22 +17,4 @@ public class User
     public string Username { get; private set; } = string.Empty;
     
     public IReadOnlyList<UserQuiz> QuizAttempts => _quizAttempts.AsReadOnly();
-
-    public UserQuiz JoinQuiz(Quiz quiz)
-    {
-        var userQuiz = new UserQuiz(UserId, quiz);
-        _quizAttempts.Add(userQuiz);
-
-        return userQuiz;
-    }
-
-    public UserQuiz? GetQuizAttempt(Guid userQuizId)
-    {
-        return _quizAttempts.FirstOrDefault(ua => ua.UserQuizId == userQuizId);
-    }
-
-    public UserQuiz? GetActiveQuizAttempt(Guid quizId)
-    {
-        return _quizAttempts.FirstOrDefault(ua => ua.QuizId == quizId && ua.IsInProgress);
-    }
 }

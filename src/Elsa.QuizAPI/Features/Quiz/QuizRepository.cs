@@ -1,114 +1,85 @@
-// using Elsa.QuizAPI.Data;
-// using Microsoft.EntityFrameworkCore;
+using Elsa.QuizAPI.Data;
+using Elsa.QuizAPI.Domain.Models;
+using Microsoft.EntityFrameworkCore;
 
-// namespace Elsa.QuizAPI.Features.Quizzes;
+namespace Elsa.QuizAPI.Features.Quizzes;
 
-// public interface IQuizRepository
-// {
-//     Task<Quiz?> GetQuizAsync(string quizId);
-//     Task<Quiz?> GetQuizWithQuestionsAsync(string quizId, CancellationToken cancellationToken = default);
-//     Task<UserScore?> GetUserScoreAsync(string userId, string quizId);
-//     Task<List<LeaderboardEntry>> GetLeaderboardAsync(string quizId, int limit = 10);
-//     Task<UserScore> CreateOrUpdateUserScoreAsync(UserScore userScore);
-//     Task<AnswerRecord> SaveAnswerRecordAsync(AnswerRecord answerRecord);
-//     Task<bool> IsAnswerAlreadySubmittedAsync(string submissionId);
-//     Task<AnswerRecord?> GetAnswerRecordAsync(string submissionId);
-// }
+public interface IQuizRepository
+{
+    Task<Quiz?> GetQuizAsync(Guid quizId, CancellationToken cancellationToken = default);
+    Task<UserQuiz?> GetUserQuizAsync(Guid userId, Guid quizId, CancellationToken cancellationToken = default);
+    Task<UserQuiz> AddUserQuizAsync(UserQuiz userQuiz, CancellationToken cancellationToken = default);
+    Task<UserQuiz> UpdateUserQuizAsync(UserQuiz userQuiz, CancellationToken cancellationToken = default);
+}
 
-// public class QuizRepository : IQuizRepository
-// {
-//     private readonly QuizDbContext _context;
+public class QuizRepository : IQuizRepository
+{
+    private readonly QuizDbContext _context;
+    private readonly ILogger<QuizRepository> _logger;
 
-//     public QuizRepository(QuizDbContext context)
-//     {
-//         _context = context;
-//     }
+    public QuizRepository(QuizDbContext context, ILogger<QuizRepository> logger)
+    {
+        _context = context;
+        _logger = logger;
+    }
 
-//     public async Task<Quiz?> GetQuizAsync(string quizId)
-//     {
-//         return await _context.Quizzes
-//             .FirstOrDefaultAsync(q => q.QuizId == quizId && q.IsActive);
-//     }
+    public async Task<Quiz?> GetQuizAsync(Guid quizId, CancellationToken cancellationToken = default)
+    {
+        var quiz = await _context.Quizzes
+            .Include(q => q.Questions)
+            .FirstOrDefaultAsync(q => q.QuizId == quizId, cancellationToken);
 
-//     public async Task<Quiz?> GetQuizWithQuestionsAsync(string quizId, CancellationToken cancellationToken = default)
-//     {
-//         var quiz = await _context.Quizzes
-//             .Include(q => q.Questions.OrderBy(qu => qu.OrderIndex))
-//             .FirstOrDefaultAsync(q => q.QuizId == quizId && q.IsActive, cancellationToken);
+        return quiz;
+    }
 
-//         // if (quiz != null)
-//         // {
-//         //     // Build lookup tables for performance
-//         //     quiz.AnswerKey = quiz.Questions.ToDictionary(q => q.QuestionId, q => q.CorrectAnswer);
-//         //     quiz.QuestionPoints = quiz.Questions.ToDictionary(q => q.QuestionId, q => q.Points);
-//         // }
+    public async Task<UserQuiz?> GetUserQuizAsync(Guid userId, Guid quizId, CancellationToken cancellationToken = default)
+    {
+        return await _context.UserQuizzes
+            .Include(q => q.QuestionAttempts)
+            .FirstOrDefaultAsync(q => q.UserId == userId && q.QuizId == quizId);
+    }
 
-//         return quiz;
-//     }
+    public async Task<UserQuiz> AddUserQuizAsync(UserQuiz userQuiz, CancellationToken cancellationToken = default)
+    {
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-//     public async Task<UserScore?> GetUserScoreAsync(string userId, string quizId)
-//     {
-//         return await _context.UserScores
-//             .FirstOrDefaultAsync(us => us.UserId == userId && us.QuizId == quizId);
-//     }
+        try
+        {
+            // Add quiz
+            _context.UserQuizzes.Add(userQuiz);
+            await _context.SaveChangesAsync(cancellationToken);
 
-//     public async Task<List<LeaderboardEntry>> GetLeaderboardAsync(string quizId, int limit = 10)
-//     {
-//         return await _context.UserScores
-//             .Where(us => us.QuizId == quizId)
-//             .OrderByDescending(us => us.TotalScore)
-//             .ThenBy(us => us.CompletionTime)
-//             .Select((us, index) => new LeaderboardEntry
-//             {
-//                 UserId = us.UserId,
-//                 Username = us.Username,
-//                 Score = us.TotalScore,
-//                 Rank = index + 1,
-//                 IsCompleted = us.IsCompleted,
-//                 CompletionTime = us.CompletionTime
-//             })
-//             .Take(limit)
-//             .ToListAsync();
-//     }
+            await transaction.CommitAsync(cancellationToken);
 
-//     public async Task<UserScore> CreateOrUpdateUserScoreAsync(UserScore userScore)
-//     {
-//         var existing = await GetUserScoreAsync(userScore.UserId, userScore.QuizId);
+            return userQuiz;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "User {UserId} failed to join quiz {QuizId}", userQuiz.UserId, userQuiz.QuizId);
+            throw;
+        }
+    }
+    
+    
 
-//         if (existing == null)
-//         {
-//             _context.UserScores.Add(userScore);
-//         }
-//         else
-//         {
-//             existing.TotalScore = userScore.TotalScore;
-//             existing.CorrectAnswers = userScore.CorrectAnswers;
-//             existing.TotalQuestions = userScore.TotalQuestions;
-//             existing.IsCompleted = userScore.IsCompleted;
-//             existing.CompletedAt = userScore.CompletedAt;
-//             existing.CompletionTime = userScore.CompletionTime;
-//         }
+    public async Task<UserQuiz> UpdateUserQuizAsync(UserQuiz userQuiz, CancellationToken cancellationToken = default)
+    {
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
 
-//         await _context.SaveChangesAsync();
-//         return existing ?? userScore;
-//     }
+            await transaction.CommitAsync(cancellationToken);
 
-//     public async Task<AnswerRecord> SaveAnswerRecordAsync(AnswerRecord answerRecord)
-//     {
-//         _context.AnswerRecords.Add(answerRecord);
-//         await _context.SaveChangesAsync();
-//         return answerRecord;
-//     }
-
-//     public async Task<bool> IsAnswerAlreadySubmittedAsync(string submissionId)
-//     {
-//         return await _context.AnswerRecords
-//             .AnyAsync(ar => ar.SubmissionId == submissionId);
-//     }
-
-//     public async Task<AnswerRecord?> GetAnswerRecordAsync(string submissionId)
-//     {
-//         return await _context.AnswerRecords
-//             .FirstOrDefaultAsync(ar => ar.SubmissionId == submissionId);
-//     }
-// }
+            return userQuiz;
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "User {UserId} failed to join quiz {QuizId}", userQuiz.UserId, userQuiz.QuizId);
+            throw;
+        }
+    }
+}

@@ -1,145 +1,289 @@
-// using Elsa.QuizAPI.Data;
-// using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
+using System.Net;
+using Elsa.QuizAPI.Domain.Models;
+using Elsa.QuizAPI.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 
-// namespace Elsa.QuizAPI.Features.Quizzes;
+namespace Elsa.QuizAPI.Features.Quizzes;
 
-// [ApiController]
-// [Route("api/[controller]")]
-// public class QuizController : ControllerBase
-// {
-//     private readonly IQuizService _quizService;
-//     private readonly ILogger<QuizController> _logger;
+/// <summary>
+/// Quiz Participation API - Handles user quiz interactions, joining, and answering
+/// </summary>
+[ApiController]
+[Route("api/v1/quiz")]
+[Produces("application/json")]
+[Tags("Quiz Participation")]
+public class QuizController : ControllerBase
+{
+    private readonly IQuizService _quizService;
+    private readonly IUserContext _userContext;
+    private readonly ILogger<QuizController> _logger;
 
-//     public QuizController(IQuizService quizService, ILogger<QuizController> logger)
-//     {
-//         _quizService = quizService;
-//         _logger = logger;
-//     }
+    public QuizController(IQuizService quizService, IUserContext userContext, ILogger<QuizController> logger)
+    {
+        _quizService = quizService;
+        _userContext = userContext;
+        _logger = logger;
+    }
 
-//     [HttpPost("submit-answer")]
-//     public async Task<ActionResult<SubmissionResult>> SubmitAnswer([FromBody] SubmitAnswerRequest request)
-//     {
-//         try
-//         {
-//             var submission = new AnswerSubmission
-//             {
-//                 SubmissionId = request.SubmissionId ?? Guid.NewGuid().ToString(),
-//                 UserId = request.UserId,
-//                 Username = request.Username,
-//                 QuizId = request.QuizId,
-//                 QuestionId = request.QuestionId,
-//                 Answer = request.Answer.Trim(),
-//                 Timestamp = DateTime.UtcNow,
-//                 ResponseTime = TimeSpan.FromMilliseconds(request.ResponseTimeMs)
-//             };
+    /// <summary>
+    /// Join a quiz session
+    /// </summary>
+    /// <param name="request">Join quiz request containing user and quiz information</param>
+    /// <param name="cancellationToken">Cancellation token for request cancellation</param>
+    /// <returns>Quiz session details</returns>
+    /// <remarks>
+    /// Allows a user to join an active quiz session. If the user has already joined,
+    /// returns their existing state instead of creating a duplicate entry.
+    /// </remarks>
+    /// <response code="200">Successfully joined quiz or returned existing session</response>
+    /// <response code="400">Invalid request data or validation errors</response>
+    /// <response code="404">Quiz not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPost("join")]
+    [ProducesResponseType(typeof(JoinQuizResponse), (int)HttpStatusCode.OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), (int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
+    public async Task<ActionResult<JoinQuizResponse>> JoinQuiz(
+        [FromBody] JoinQuizRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("User {UserId} attempting to join quiz {QuizId}",
+                _userContext.GetCurrentUser().UserId, request.QuizId);
 
-//             // Process answer and publish events to Redis
-//             var result = await _quizService.SubmitAnswerAsync(submission);
+            var result = await _quizService.JoinQuizAsync(_userContext.GetCurrentUser().UserId, request, cancellationToken);
 
-//             return Ok(result);
-//         }
-//         catch (Exception ex)
-//         {
-//             _logger.LogError(ex, "Failed to submit answer");
-//             return StatusCode(500, "Internal server error");
-//         }
-//     }
+            if (result == null)
+            {
+                _logger.LogWarning("Quiz {QuizId} not found or not active", request.QuizId);
+                return NotFound(new ProblemDetails
+                {
+                    Title = "Quiz Not Found",
+                    Detail = $"Quiz '{request.QuizId}' was not found or is not currently active",
+                    Status = (int)HttpStatusCode.NotFound,
+                    Instance = HttpContext.Request.Path
+                });
+            }
 
-//     [HttpGet("{quizId}")]
-//     public async Task<ActionResult<QuizDto>> GetQuiz(string quizId, CancellationToken cancellationToken)
-//     {
-//         try
-//         {
-//             // Quiz API handles all business logic
-//             var quiz = await _quizService.GetQuizAsync(quizId, cancellationToken);
-//             if (quiz == null) return NotFound();
+            _logger.LogInformation("User {UserId} successfully joined quiz {QuizId}.",
+                _userContext.GetCurrentUser().UserId, request.QuizId);
 
-//             return Ok(new QuizDto
-//             {
-//                 QuizId = quiz.QuizId,
-//                 Title = quiz.Title,
-//                 Description = quiz.Description,
-//                 TimeLimit = quiz.TimeLimit,
-//                 TotalQuestions = quiz.Questions.Count
-//             });
-//         }
-//         catch (OperationCanceledException)
-//         {
-//             return new EmptyResult();
-//         }
-//     }
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning("Invalid join request: {Message}", ex.Message);
+            return BadRequest(new ValidationProblemDetails
+            {
+                Title = "Invalid Join Request",
+                Detail = ex.Message,
+                Status = (int)HttpStatusCode.BadRequest,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Quiz join operation cancelled");
+            return StatusCode((int)HttpStatusCode.RequestTimeout);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to join quiz {QuizId} for user {UserId}",
+                request.QuizId, _userContext.GetCurrentUser().UserId);
+            return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
+            {
+                Title = "Internal Server Error",
+                Detail = "An unexpected error occurred while joining the quiz",
+                Status = (int)HttpStatusCode.InternalServerError,
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
 
-//     // [HttpGet("{quizId}/questions")]
-//     // public async Task<ActionResult<List<QuestionDto>>> GetQuizQuestions(string quizId)
-//     // {
-//     //     var questions = await _quizService.GetQuizQuestionsAsync(quizId);
-//     //     return Ok(questions);
-//     // }
+    /// <summary>
+    /// Submit an answer to a quiz question
+    /// </summary>
+    /// <param name="request">Answer submission containing user response and timing information</param>
+    /// <param name="cancellationToken">Cancellation token for request cancellation</param>
+    /// <returns>Answer evaluation result with score</returns>
+    /// <remarks>
+    /// Submits and evaluates a user's answer to a specific quiz question.
+    /// The system calculates points, updates the user's total score and leaderboard position.
+    /// </remarks>
+    /// <response code="200">Answer submitted and evaluated successfully</response>
+    /// <response code="400">Invalid request data or validation errors</response>
+    /// <response code="404">Quiz or question not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPost("answer")]
+    [ProducesResponseType(typeof(SubmissionResult), (int)HttpStatusCode.OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), (int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
+    public async Task<ActionResult<SubmissionResult>> SubmitAnswer(
+        [FromBody] SubmitAnswerRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("User {UserId} submitting answer for question {QuestionId} in quiz {QuizId}",
+                _userContext.GetCurrentUser().UserId, request.QuestionId, request.QuizId);
 
-//     // [HttpGet("user/{userId}/quiz/{quizId}/state")]
-//     // public async Task<UserQuizState> GetUserQuizState(string userId, string quizId)
-//     // {
-//     //     return new UserQuizState
-//     //     {
-//     //         Quiz = await _cachedQuizService.GetQuizAsync(quizId),
-//     //         UserScore = await _quizRepository.GetUserScoreAsync(userId, quizId),
-//     //         AnsweredQuestions = await _quizRepository.GetUserAnswerHistoryAsync(userId, quizId),
-//     //         Leaderboard = await _quizRepository.GetLeaderboardAsync(quizId),
-//     //         LastSyncTimestamp = DateTime.UtcNow
-//     //     };
-//     // }
-// }
+            var result = await _quizService.SubmitAnswerAsync(_userContext.GetCurrentUser().UserId, request, cancellationToken);
 
-// public class QuizDto
-// {
-//     public string QuizId { get; set; } = string.Empty;
-//     public string Title { get; set; } = string.Empty;
-//     public string Description { get; set; } = string.Empty;
-//     public TimeSpan TimeLimit { get; set; }
-//     public int TotalQuestions { get; set; }
-//     public string ScoringType { get; set; } = string.Empty;
-// }
+            _logger.LogInformation("Answer submitted successfully. User {UserId}, Question {QuestionId}, Correct: {IsCorrect}, Points: {Points}",
+                _userContext.GetCurrentUser().UserId, request.QuestionId, result.IsCorrect, result.PointsEarned);
 
-// public class QuestionDto
-// {
-//     public string QuestionId { get; set; } = string.Empty;
-//     public string Text { get; set; } = string.Empty;
-//     public string Type { get; set; } = string.Empty;
-//     public List<string> Options { get; set; } = new();
-//     public int Points { get; set; }
-//     public int OrderIndex { get; set; }
-//     public string Category { get; set; } = string.Empty;
-// }
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning("Invalid answer submission: {Message}", ex.Message);
+            return BadRequest(new ValidationProblemDetails
+            {
+                Title = "Invalid Answer Submission",
+                Detail = ex.Message,
+                Status = (int)HttpStatusCode.BadRequest,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            _logger.LogWarning("Quiz or question not found: {Message}", ex.Message);
+            return NotFound(new ProblemDetails
+            {
+                Title = "Quiz or Question Not Found",
+                Detail = ex.Message,
+                Status = (int)HttpStatusCode.NotFound,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Answer submission cancelled");
+            return StatusCode((int)HttpStatusCode.RequestTimeout);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to submit answer for user {UserId}, question {QuestionId}",
+                _userContext.GetCurrentUser().UserId, request.QuestionId);
+            return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
+            {
+                Title = "Internal Server Error",
+                Detail = "An unexpected error occurred while submitting the answer",
+                Status = (int)HttpStatusCode.InternalServerError,
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+}
 
-// public class SubmitAnswerRequest
-// {
-//     public string? SubmissionId { get; set; }
-//     public string UserId { get; set; } = string.Empty;
-//     public string Username { get; set; } = string.Empty;
-//     public string QuizId { get; set; } = string.Empty;
-//     public string QuestionId { get; set; } = string.Empty;
-//     public string Answer { get; set; } = string.Empty;
-//     public int ResponseTimeMs { get; set; }
-// }
+/// <summary>
+/// Request model for joining a quiz
+/// </summary>
+public class JoinQuizRequest
+{
+    /// <summary>
+    /// Unique identifier for the quiz to join (required)
+    /// </summary>
+    /// <example>123e4567-e89b-12d3-a456-426614174000</example>
+    [Required(ErrorMessage = "Quiz ID is required")]
+    public Guid QuizId { get; set; }
+}
 
-// public class UserQuizState
-// {
-//     public string UserId { get; set; } = string.Empty;
-//     public string QuizId { get; set; } = string.Empty;
-//     public Quiz Quiz { get; set; } = new();
-//     public UserScore? UserScore { get; set; }
-//     public Dictionary<string, AnswerStateDto> AnsweredQuestions { get; set; } = new();
-//     public List<LeaderboardEntry> Leaderboard { get; set; } = new();
-//     public DateTime LastSyncTimestamp { get; set; }
-//     public bool IsQuizCompleted { get; set; }
-// }
+/// <summary>
+/// Response model for joining a quiz
+/// </summary>
+public class JoinQuizResponse
+{
+    /// <summary>
+    /// Quiz identifier
+    /// </summary>
+    /// <example>123e4567-e89b-12d3-a456-426614174000</example>
+    public Guid QuizId { get; set; }
 
-// public class AnswerStateDto
-// {
-//     public string Answer { get; set; } = string.Empty;
-//     public bool IsCorrect { get; set; }
-//     public int PointsEarned { get; set; }
-//     public DateTime SubmittedAt { get; set; }
-//     public string SubmissionId { get; set; } = string.Empty;
-//     public string CorrectAnswer { get; set; } = string.Empty;
-// }
+    /// <summary>
+    /// User quiz session identifier
+    /// </summary>
+    /// <example>1651c284-3a36-4870-b1ea-9720cc95c0cb</example>
+    public Guid UserQuizId { get; set; }
+
+    /// <summary>
+    /// Quiz title
+    /// </summary>
+    /// <example>English Vocabulary Quiz</example>
+    public string Title { get; set; }
+
+    /// <summary>
+    /// Quiz description
+    /// </summary>
+    /// <example>Test your English vocabulary knowledge</example>
+    public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Total time limit for the quiz
+    /// </summary>
+    /// <example>00:30:00</example>
+    public TimeSpan TimeLimit { get; set; }
+
+}
+
+/// <summary>
+/// Request model for submitting an answer
+/// </summary>
+public class SubmitAnswerRequest
+{
+    /// <summary>
+    /// Quiz identifier (required)
+    /// </summary>
+    /// <example>123e4567-e89b-12d3-a456-426614174000</example>
+    [Required(ErrorMessage = "Quiz ID is required")]
+    public Guid QuizId { get; set; }
+
+    /// <summary>
+    /// Question identifier (required)
+    /// </summary>
+    /// <example>456e7890-e12b-34c5-d678-901234567890</example>
+    [Required(ErrorMessage = "Question ID is required")]
+    public Guid QuestionId { get; set; }
+
+    /// <summary>
+    /// User's answer (required, 1-500 characters)
+    /// </summary>
+    /// <example>Present everywhere</example>
+    [Required(ErrorMessage = "Answer is required")]
+    [StringLength(500, MinimumLength = 1, ErrorMessage = "Answer must be between 1 and 500 characters")]
+    public string Answer { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response model for answer submission
+/// </summary>
+public class SubmissionResult
+{
+    /// <summary>
+    /// User session identifier
+    /// </summary>
+    /// <example>456e7890-e12b-34c5-d678-901234567890</example>
+    public Guid UserQuizId { get; set; }
+
+    /// <summary>
+    /// Whether the answer was correct
+    /// </summary>
+    /// <example>true</example>
+    public bool IsCorrect { get; set; }
+
+    /// <summary>
+    /// Points earned for this answer
+    /// </summary>
+    /// <example>10</example>
+    public int PointsEarned { get; set; }
+
+    /// <summary>
+    /// Total points earned
+    /// </summary>
+    /// <example>100</example>
+    public int TotalPointsEarned { get; set; }
+}

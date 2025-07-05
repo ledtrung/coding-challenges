@@ -4,28 +4,29 @@ public class QuizQuestion
 {
     private QuizQuestion() { }
 
-    public QuizQuestion(Guid quizId, string text, int points, QuizQuestionOption correctOption)
+    public QuizQuestion(string text, int points, List<QuizQuestionOption>? options)
     {
-        if (Guid.Empty.Equals(quizId))
-            throw new ArgumentException("Quiz ID cannot be empty", nameof(quizId));
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Question text cannot be empty", nameof(text));
         if (points < 0)
             throw new ArgumentException("Points cannot be negative", nameof(points));
-        if (correctOption is null || string.IsNullOrWhiteSpace(correctOption.OptionText) || !correctOption.IsCorrect)
-            throw new ArgumentException("Invalid correct option", nameof(correctOption));
 
-        QuizId = quizId;
         Text = text.Trim();
         Points = points;
-        Options.Add(correctOption);
+        if (options?.Count > 0)
+        { 
+            foreach (var option in options)
+            {
+                AddOption(option.OptionText, option.IsCorrect);
+            }
+        }
     }
 
-    public Guid QuestionId { get; private set; }
-    public Guid QuizId { get; private set; }
-    public string Text { get; private set; } = string.Empty;
-    public int Points { get; private set; }
-    public List<QuizQuestionOption> Options { get; private set; } = new();
+    public Guid QuestionId { get; init; }
+    public Guid QuizId { get; init; }
+    public string Text { get; init; } = string.Empty;
+    public int Points { get; init; }
+    public List<QuizQuestionOption> Options { get; init; } = new();
 
     public void AddOption(string optionText, bool correctOption)
     {
@@ -66,6 +67,6 @@ public class QuizQuestionOption
         IsCorrect = isCorrect;
     }
 
-    public string OptionText { get; private set; }
-    public bool IsCorrect { get; private set; }
+    public string OptionText { get; init; }
+    public bool IsCorrect { get; init; }
 }

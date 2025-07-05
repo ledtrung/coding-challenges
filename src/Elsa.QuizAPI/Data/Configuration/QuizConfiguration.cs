@@ -20,8 +20,8 @@ public class QuizConfiguration : IEntityTypeConfiguration<Quiz>
         builder.Property(q => q.Description)
             .HasMaxLength(1000);
             
-        builder.Metadata.FindNavigation(nameof(Quiz.Questions))!
-            .SetPropertyAccessMode(PropertyAccessMode.Field);
+        // builder.Metadata.FindNavigation(nameof(Quiz.Questions))!
+        //     .SetPropertyAccessMode(PropertyAccessMode.Field);
             
         builder.HasMany(q => q.Questions)
             .WithOne()

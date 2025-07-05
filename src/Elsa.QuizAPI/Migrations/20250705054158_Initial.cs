@@ -59,7 +59,7 @@ namespace Elsa.QuizAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "UserQuiz",
+                name: "UserQuizzes",
                 columns: table => new
                 {
                     UserQuizId = table.Column<Guid>(type: "uuid", nullable: false),
@@ -73,9 +73,9 @@ namespace Elsa.QuizAPI.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_UserQuiz", x => x.UserQuizId);
+                    table.PrimaryKey("PK_UserQuizzes", x => x.UserQuizId);
                     table.ForeignKey(
-                        name: "FK_UserQuiz_Users_UserId",
+                        name: "FK_UserQuizzes_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
@@ -99,9 +99,9 @@ namespace Elsa.QuizAPI.Migrations
                 {
                     table.PrimaryKey("PK_UserQuizQuestion", x => x.UserQuizQuestionId);
                     table.ForeignKey(
-                        name: "FK_UserQuizQuestion_UserQuiz_UserQuizId",
+                        name: "FK_UserQuizQuestion_UserQuizzes_UserQuizId",
                         column: x => x.UserQuizId,
-                        principalTable: "UserQuiz",
+                        principalTable: "UserQuizzes",
                         principalColumn: "UserQuizId",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -112,14 +112,14 @@ namespace Elsa.QuizAPI.Migrations
                 column: "QuizId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_UserQuiz_UserId",
-                table: "UserQuiz",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_UserQuizQuestion_UserQuizId",
                 table: "UserQuizQuestion",
                 column: "UserQuizId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserQuizzes_UserId",
+                table: "UserQuizzes",
+                column: "UserId");
         }
 
         /// <inheritdoc />
@@ -135,7 +135,7 @@ namespace Elsa.QuizAPI.Migrations
                 name: "Quizzes");
 
             migrationBuilder.DropTable(
-                name: "UserQuiz");
+                name: "UserQuizzes");
 
             migrationBuilder.DropTable(
                 name: "Users");

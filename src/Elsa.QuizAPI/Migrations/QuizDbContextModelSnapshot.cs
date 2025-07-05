@@ -121,7 +121,7 @@ namespace Elsa.QuizAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserQuiz");
+                    b.ToTable("UserQuizzes");
                 });
 
             modelBuilder.Entity("Elsa.QuizAPI.Domain.Models.UserQuizQuestion", b =>
