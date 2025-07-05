@@ -47,7 +47,8 @@ public class RedisSubscriptionService : IRedisSubscriptionService
                         var scoreUpdate = JsonSerializer.Deserialize<QuizQuestionAnsweredEvent>(message);
                         if (scoreUpdate != null)
                         {
-                            await HandlePointsUpdateAsync(scoreUpdate);
+                            await HandlePointsUpdateForUserAsync(scoreUpdate);
+                            await HandlePointsUpdateForLeaderboardAsync(scoreUpdate);
                         }
                     }
                     catch (Exception ex)
@@ -74,15 +75,20 @@ public class RedisSubscriptionService : IRedisSubscriptionService
         }
     }
 
-    private async Task HandlePointsUpdateAsync(QuizQuestionAnsweredEvent @event)
+    /// <summary>
+    /// This will send an updated event to the user connection
+    /// </summary>
+    /// <param name="event"></param>
+    /// <returns></returns>
+    private async Task HandlePointsUpdateForUserAsync(QuizQuestionAnsweredEvent @event)
     {
         try
         {
-            var connections = _connectionManager.GetConnectionsForQuiz(@event.QuizId.ToString());
-            
-            if (connections.Any())
+            var connection = _connectionManager.GetUserConnection(@event.UserId.ToString());
+
+            if (connection is not null)
             {
-                await _hubContext.Clients.Clients(connections).SendAsync("UserPointsUpdated", new
+                await _hubContext.Clients.Client(connection.ConnectionId).SendAsync("UserPointsUpdated", new
                 {
                     UserId = @event.UserId,
                     QuizId = @event.QuizId,
@@ -92,7 +98,35 @@ public class RedisSubscriptionService : IRedisSubscriptionService
                     TotalPointsEarned = @event.TotalPointsEarned
                 });
 
-                _logger.LogDebug($"Score update broadcasted to {connections.Count()} connections for quiz {@event.QuizId}");
+                _logger.LogDebug($"Points update broadcasted to {connection.ConnectionId} for quiz {@event.QuizId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling score update");
+        }
+    }
+
+    /// <summary>
+    /// This will send an updated event to all users that are connecting to a quiz
+    /// </summary>
+    /// <param name="event"></param>
+    /// <returns></returns>
+    private async Task HandlePointsUpdateForLeaderboardAsync(QuizQuestionAnsweredEvent @event)
+    {
+        try
+        {
+            var connections = _connectionManager.GetConnectionsForQuiz(@event.QuizId.ToString());
+
+            if (connections.Any())
+            {
+                await _hubContext.Clients.Clients(connections).SendAsync("LeaderboardUpdated", new
+                {
+                    UserId = @event.UserId,
+                    TotalPointsEarned = @event.TotalPointsEarned
+                });
+
+                _logger.LogDebug($"Points update broadcasted to {connections.Count()} connections for quiz {@event.QuizId}");
             }
         }
         catch (Exception ex)

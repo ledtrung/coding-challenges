@@ -88,16 +88,6 @@
             </div>
         </div>
         
-        <div class="panel">
-            <h3>Quiz Actions</h3>
-            <div class="controls">
-                <input type="text" id="messageInput" placeholder="Send message">
-                <button onclick="sendMessage()">Send Message</button>
-                <br>
-                <button onclick="requestQuizStatus()">Request Quiz Status</button>
-                <button onclick="simulateScoreUpdate()">Simulate Score Update</button>
-            </div>
-        </div>
     </div>
 
     <div class="container">
@@ -141,8 +131,8 @@
             if (leaderboard && leaderboard.length > 0) {
                 leaderboardDiv.innerHTML = leaderboard.map(entry => 
                     `<div class="leaderboard-item">
-                        <span>#${entry.rank} ${entry.username}</span>
-                        <span>${entry.score} pts</span>
+                        <span>#${entry.userId}</span>
+                        <span>${entry.totalPointsEarned} pts</span>
                     </div>`
                 ).join('');
             } else {
@@ -163,7 +153,7 @@
             try {
                 // Create connection
                 connection = new signalR.HubConnectionBuilder()
-                    .withUrl("http://localhost:5129/quizHub", {
+                    .withUrl("http://localhost:5002/quizHub", {
                         skipNegotiation: true,  // skipNegotiation as we specify WebSockets
                         transport: signalR.HttpTransportType.WebSockets  // force WebSocket transport
                     })
@@ -174,7 +164,7 @@
                 connection.on("UserPointsUpdated", (data) => {
                     log(`Point Update: ${data.userId} earned ${data.pointsEarned} points (${data.isCorrect ? 'Correct' : 'Incorrect'}). New score: ${data.totalPointsEarned}`);
                 });
-
+                
                 connection.on("Error", (message) => {
                     log(`Error: ${message}`);
                 });

@@ -9,12 +9,14 @@ public interface IQuizConnectionManager
     Task RemoveConnectionAsync(string connectionId);
     IEnumerable<string> GetConnectionsForQuiz(string quizId);
     string? GetQuizIdForConnection(string connectionId);
+    QuizConnection? GetUserConnection(string userId);
     QuizConnection? GetConnection(string connectionId);
 }
 
 public class QuizConnectionManager : IQuizConnectionManager
 {
     private readonly ConcurrentDictionary<string, QuizConnection> _connections = new();
+    private readonly ConcurrentDictionary<string, QuizConnection> _userConnections = new();
     private readonly ConcurrentDictionary<string, HashSet<string>> _quizConnections = new();
     private readonly ILogger<QuizConnectionManager> _logger;
 
@@ -33,6 +35,7 @@ public class QuizConnectionManager : IQuizConnectionManager
         };
 
         _connections.AddOrUpdate(connectionId, connection, (key, oldValue) => connection);
+        _userConnections.AddOrUpdate(userId, connection, (key, oldValue) => connection);
 
         _quizConnections.AddOrUpdate(quizId,
             new HashSet<string> { connectionId },
@@ -83,6 +86,13 @@ public class QuizConnectionManager : IQuizConnectionManager
     {
         return _connections.TryGetValue(connectionId, out var connection)
             ? connection.QuizId
+            : null;
+    }
+
+    public QuizConnection? GetUserConnection(string userId)
+    {
+        return _userConnections.TryGetValue(userId, out var connection)
+            ? connection
             : null;
     }
 
